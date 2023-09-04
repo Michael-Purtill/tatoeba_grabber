@@ -1,0 +1,12 @@
+{
+	"authors": [
+		"caterpillar"
+	],
+	"copyright": "Copyright © 2023, caterpillar",
+	"dependencies": {
+		"requests": "~>2.1.1"
+	},
+	"description": "Grab sentences and audio from tatoeba for a given language.",
+	"license": "FREE",
+	"name": "tatoeba_grabber"
+}

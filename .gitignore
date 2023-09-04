@@ -1,0 +1,16 @@
+.dub
+docs.json
+__dummy.html
+docs/
+/tatoeba_grabber
+tatoeba_grabber.so
+tatoeba_grabber.dylib
+tatoeba_grabber.dll
+tatoeba_grabber.a
+tatoeba_grabber.lib
+tatoeba_grabber-test-*
+*.exe
+*.pdb
+*.o
+*.obj
+*.lst
