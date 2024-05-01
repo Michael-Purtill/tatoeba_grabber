@@ -3,16 +3,34 @@ import std.format;
 import std.json;
 import requests;
 import std.algorithm;
+import std.getopt;
+import std.file;
 
-void main()
+const string apiUrl = "https://tatoeba.org/en/api_v0/search";
+const string audioApiUrl = "https://tatoeba.org/en/audio/download/";
+
+int main(string[] args)
 {
+	// API OPTIONS
+	string langFrom = "";
+	string langTo = "";
+	bool hasAudio = false;
 	long pageCount = 0;
-	const int perPage = 10; // this is the default perPage value in tatoeba's api.
+	string directory = "./tatoeba_results";
 
-	const string apiUrl = "https://tatoeba.org/en/api_v0/search";
-	const string audioApiUrl = "https://tatoeba.org/en/audio/download/";
+	getopt(args,
+		"l|lang", &langFrom,
+		"a|audio", &hasAudio,
+		"d|destination", &directory
+	);
 
-	auto statsRes = getContent(apiUrl, ["from": "jpn", "has_audio": "yes", "query": "", "to": "", "page": "1"]);
+	auto statsRes = getContent(apiUrl, [
+			"from": langFrom,
+			"has_audio": hasAudio ? "yes": "no",
+			"query": "",
+			"to": "",
+			"page": "1" // seems like tatoeba's api is 1-indexed.
+		]);
 
 	JSONValue statsJson = parseJSON(statsRes.toString());
 
@@ -20,22 +38,41 @@ void main()
 
 	pageCount = paging["Sentences"]["pageCount"].integer;
 
-	char[] csvString = cast (char[]) "Sentence, Audio,\n".idup();
+	try
+	{
+		mkdir(directory);
+	}
+	catch (Exception e)
+	{
+		writeln("couldn't create directory %s".format(directory));
+		return 1;
+	}
 
-	foreach (i; 1..(pageCount + 1)) {
-		auto res = getContent(apiUrl, ["from": "jpn", "has_audio": "yes", "query": "", "to": "", "page": "%d".format(i)]);
+	foreach (i; 1 .. (pageCount + 1))
+	{
+		auto res = getContent(apiUrl, [
+				"from": "jpn",
+				"has_audio": "yes",
+				"query": "",
+				"to": "",
+				"page": "%d".format(i)
+			]);
 
 		JSONValue jsonContent = parseJSON(res.toString());
 
 		JSONValue sentences = jsonContent["results"];
 
-		foreach (s; sentences.array()) {
+		foreach (s; sentences.array())
+		{
 			string text = s["text"].str;
 			long audioId = s["audios"][0]["id"].integer;
 			string audioUrl = "%s%d".format(audioApiUrl, audioId);
-			csvString ~= "%s,%s,\n".format(text, audioUrl);
+
+			File file = File(directory ~ "/" ~ text ~ ".txt", "w+");
+
+			file.writeln(text);
 		}
 	}
 
-	writeln(csvString);
+	return 0;
 }
