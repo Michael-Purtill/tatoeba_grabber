@@ -1,0 +1,6 @@
+services:
+  tba:
+    image: tba
+    build: .
+    volumes:
+      - ./:/code
