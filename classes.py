@@ -60,3 +60,5 @@ class NLP:
         for s in ss.sentences:
             processed = mdl(s)
             self.token_sets.append(processed)
+    
+    
