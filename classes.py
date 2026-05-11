@@ -1,6 +1,11 @@
 from dataclasses import dataclass
 import httpx
 import json
+import spacy
+
+lang_model_map = {
+    'fr': 'fr_core_news_md'
+}
 
 @dataclass
 class SentenceSet:
@@ -45,11 +50,15 @@ class Tatoeba(Scraper):
             res = json.loads(httpx.get(**fmtd_obj).text)
             
             yield ss
-            
-    
-            
 
+class NLP:
+    token_sets = []
+    
+    def __init__(self, ss: SentenceSet):
+        mdl = spacy.load(lang_model_map[ss.lang])
         
-        
-        
+        for s in ss.sentences:
+            processed = mdl(s)
+            self.token_sets.append(processed)
+    
     
