@@ -1,12 +1,11 @@
-from classes import Tatoeba, NLP
-
+from corpus.demaistre import DeMaistre
 def main():
-    t = Tatoeba({'page': 1, 'lang': 'fra', 'min_words': 7})
+    corpus = DeMaistre()
+    pages = corpus.page_iterator()
     
-    x = next(t.sentence_generator())
+    for p in pages:
+        (corpus.sentence_generator(p))
     
-    nlp = NLP(x)
     
-    print(nlp.token_sets[0][0].morph)
 if __name__ == '__main__':
     main()

@@ -18,4 +18,5 @@ tatoeba_grabber-test-*
 *.pyc
 *.pyo
 *.pyd
+.venv
 
