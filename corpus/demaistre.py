@@ -54,10 +54,14 @@ class DeMaistre(Corpus):
             
             for token in sent:
                 sd = {
+                    'i': token.i,                    # position — you need this to sort groups
                     'token': token.text,
+                    'lemma': token.lemma_,
                     'pos': token.pos_,
                     'tag': token.tag_,
-                    'morph': token.morph
+                    'dep': token.dep_,               # the link type
+                    'head_i': token.head.i,          # the anchor
+                    'morph': str(token.morph),       # see note below
                 }
                 raw_sent_dicts.append(sd)
             
