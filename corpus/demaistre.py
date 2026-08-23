@@ -46,39 +46,49 @@ class DeMaistre(Corpus):
                 i += 1
                 yield self.page_processor(rp)
     
+    def sentence_frame(self, sent):
+        """One row per token of `sent`, with morph features expanded."""
+        raw_sent_dicts = []
+        groups = self.group_ids(sent)
+
+        for token in sent:
+            sd = {
+                'i': token.i,                    # position — you need this to sort groups
+                'token': token.text,
+                'lemma': token.lemma_,
+                'pos': token.pos_,
+                'tag': token.tag_,
+                'dep': token.dep_,               # the link type
+                'head_i': token.head.i,          # the anchor
+                # index of the verb anchoring this token's verbal complex,
+                # or None if the token is not part of one
+                'group_id': groups.get(token.i),
+                } | token.morph.to_dict()
+            raw_sent_dicts.append(sd)
+
+        sent_df = pd.DataFrame.from_dict(raw_sent_dicts)
+        # Nullable Int64, not int64: group_id is None for non-verbal tokens,
+        # which would otherwise coerce the whole column to float.
+        sent_df['group_id'] = sent_df['group_id'].astype('Int64')
+        return sent_df
+
     def sentence_generator(self, page):
+        """DataFrames for each sentence in `page`, easiest first.
+
+        Difficulty is scored relative to this page, so the ordering is
+        comparable within a page but not across pages.
+        """
         doc = self.nlp(page)
+        # Skip blanks: paragraph joins leave empty spans that produce empty frames.
+        sents = [s for s in doc.sents if s.text.strip()]
+
         sent_dfs = []
-        
-        # sentences = [sent.text.strip() for sent in doc.sents]\
-        for sent in doc.sents:
-            raw_sent_dicts = []
-            groups = self.group_ids(sent)
-            
-            for token in sent:
-                sd = {
-                    'i': token.i,                    # position — you need this to sort groups
-                    'token': token.text,
-                    'lemma': token.lemma_,
-                    'pos': token.pos_,
-                    'tag': token.tag_,
-                    'dep': token.dep_,               # the link type
-                    'head_i': token.head.i,          # the anchor
-                    # index of the verb anchoring this token's verbal complex,
-                    # or None if the token is not part of one
-                    'group_id': groups.get(token.i),
-                    } | token.morph.to_dict()
-                raw_sent_dicts.append(sd)
-            
-            sent_df = pd.DataFrame.from_dict(raw_sent_dicts)
-            # Nullable Int64, not int64: group_id is None for non-verbal tokens,
-            # which would otherwise coerce the whole column to float.
-            sent_df['group_id'] = sent_df['group_id'].astype('Int64')
-            print(sent_df)
-            print()
+        for score, sent, feats in self.rank_by_difficulty(sents):
+            sent_df = self.sentence_frame(sent)
+            # attrs rides along with the frame so the ordering stays explainable
+            sent_df.attrs['text'] = ' '.join(sent.text.split())
+            sent_df.attrs['difficulty'] = score
+            sent_df.attrs['difficulty_features'] = feats
             sent_dfs.append(sent_df)
-        
-        
-    
-        
-        
+
+        return sent_dfs
