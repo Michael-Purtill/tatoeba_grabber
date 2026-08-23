@@ -9,6 +9,8 @@ class DeMaistre(Corpus):
     link = 'https://fr.wikisource.org/wiki/Consid%C3%A9rations_sur_la_France'
     language = 'french'
     spacy_model = 'fr_core_news_md'
+    NEG_ADV = {'pas', 'plus', 'jamais', 'guère', 'point', 'nullement'}
+    NE_FORMS = {'ne', "n'", 'n\u2019'}
     headers = {'user-agent': 'BookScraper/1.0 (https://github.com/Michael-Purtill/tatoeba_grabber)'}
     
     def page_processor(self, page):
@@ -35,7 +37,7 @@ class DeMaistre(Corpus):
 
             raw_pages = []
             
-            for pl in page_links[0:1]:
+            for pl in page_links:
                 raw_pages.append(client.get(pl).text)
 
             i = 0
@@ -51,6 +53,7 @@ class DeMaistre(Corpus):
         # sentences = [sent.text.strip() for sent in doc.sents]\
         for sent in doc.sents:
             raw_sent_dicts = []
+            groups = self.group_ids(sent)
             
             for token in sent:
                 sd = {
@@ -61,11 +64,16 @@ class DeMaistre(Corpus):
                     'tag': token.tag_,
                     'dep': token.dep_,               # the link type
                     'head_i': token.head.i,          # the anchor
-                    'morph': str(token.morph),       # see note below
-                }
+                    # index of the verb anchoring this token's verbal complex,
+                    # or None if the token is not part of one
+                    'group_id': groups.get(token.i),
+                    } | token.morph.to_dict()
                 raw_sent_dicts.append(sd)
             
             sent_df = pd.DataFrame.from_dict(raw_sent_dicts)
+            # Nullable Int64, not int64: group_id is None for non-verbal tokens,
+            # which would otherwise coerce the whole column to float.
+            sent_df['group_id'] = sent_df['group_id'].astype('Int64')
             print(sent_df)
             print()
             sent_dfs.append(sent_df)
