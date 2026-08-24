@@ -19,4 +19,5 @@ tatoeba_grabber-test-*
 *.pyo
 *.pyd
 .venv
-
+# Generated Anki decks
+*.apkg

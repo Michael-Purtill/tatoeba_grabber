@@ -9,6 +9,29 @@ class DeMaistre(Corpus):
     link = 'https://fr.wikisource.org/wiki/Consid%C3%A9rations_sur_la_France'
     language = 'french'
     spacy_model = 'fr_core_news_md'
+    # 18th-century spellings. The -oi- forms are the big win: they carry the
+    # imperfect and conditional, which the tagger otherwise reads as present.
+    ORTHOGRAPHY_RULES = [
+        (r'oient$', 'aient', False),   # étoient  -> étaient
+        (r'oit$', 'ait', False),       # pourroit -> pourrait
+        (r'oît$', 'aît', False),       # connoît  -> connaît
+        (r'ois$', 'ais', False),       # françois -> français
+        (r'ans$', 'ants', True),       # enfans   -> enfants
+        (r'ens$', 'ents', True),       # monumens -> monuments
+    ]
+    ORTHOGRAPHY_MAP = {
+        'tems': 'temps', 'foible': 'faible', 'foibles': 'faibles',
+        'roide': 'raide', 'roides': 'raides', 'sçavoir': 'savoir',
+        # Below ORTHOGRAPHY_MIN_LENGTH, so the ending rules never see them.
+        # The length guard has to stay: at four and five characters it is
+        # "lois"/"trois"/"soit"/"doit" that the rules would otherwise eat.
+        'avoit': 'avait', 'étoit': 'était',
+        'avois': 'avais', 'étois': 'étais',
+    }
+
+    # "millions tournois" is the livre tournois, not a verb form.
+    ORTHOGRAPHY_KEEP = {'tournois', 'bourgeois', 'courtois', 'gaulois', 'patois'}
+
     NEG_ADV = {'pas', 'plus', 'jamais', 'guère', 'point', 'nullement'}
     NE_FORMS = {'ne', "n'", 'n\u2019'}
     headers = {'user-agent': 'BookScraper/1.0 (https://github.com/Michael-Purtill/tatoeba_grabber)'}
@@ -18,8 +41,15 @@ class DeMaistre(Corpus):
         # The schema.org/Chapter div is only the header template (author/title
         # nav box); the body text lives in ProofreadPage's output div.
         raw_content = soup.find(class_='prp-pages-output')
+
+        # Redlinks are pages nobody has transcribed yet; ProofreadPage renders
+        # them as their own title ("Page:Considérations sur la France.djvu/188"),
+        # which would otherwise land in the corpus as text.
+        for redlink in raw_content.select('a.new'):
+            redlink.decompose()
+
         ps = raw_content.find_all('p')
-        
+
         text = [p.get_text().strip() for p in ps]
 
         return ' '.join(text)
@@ -73,22 +103,13 @@ class DeMaistre(Corpus):
         return sent_df
 
     def sentence_generator(self, page):
-        """DataFrames for each sentence in `page`, easiest first.
+        """DataFrames for each clean sentence in `page`, in document order.
 
-        Difficulty is scored relative to this page, so the ordering is
-        comparable within a page but not across pages.
+        Use `corpus_frames` instead to rank sentences by difficulty; scoring a
+        single page calibrates the percentiles on too few sentences.
         """
-        doc = self.nlp(page)
-        # Skip blanks: paragraph joins leave empty spans that produce empty frames.
-        sents = [s for s in doc.sents if s.text.strip()]
-
-        sent_dfs = []
-        for score, sent, feats in self.rank_by_difficulty(sents):
-            sent_df = self.sentence_frame(sent)
-            # attrs rides along with the frame so the ordering stays explainable
-            sent_df.attrs['text'] = ' '.join(sent.text.split())
-            sent_df.attrs['difficulty'] = score
-            sent_df.attrs['difficulty_features'] = feats
-            sent_dfs.append(sent_df)
-
-        return sent_dfs
+        doc = self.normalized_doc(page)
+        # Some chapters are only partly proofread, so drop OCR noise before it
+        # reaches the frames (garbled tokens are all OOV and would otherwise
+        # dominate the rarity feature).
+        return [self.sentence_frame(s) for s in doc.sents if self.is_clean_sentence(s)]
