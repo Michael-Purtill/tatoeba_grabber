@@ -72,6 +72,39 @@ class Corpus:
             frames.append(frame)
         return frames
 
+    # Marian model: on this corpus it is roughly five times faster than
+    # nllb-200-distilled-600M and more faithful, though neither model preserves
+    # tense reliably — the card takes its grammar from the parse, not from here.
+    TRANSLATION_MODEL = 'Helsinki-NLP/opus-mt-fr-en'
+    TRANSLATION_BATCH = 16
+
+    def _load_translator(self):
+        from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+        if not hasattr(self, '_translator'):
+            self._translator = (
+                AutoTokenizer.from_pretrained(self.TRANSLATION_MODEL),
+                AutoModelForSeq2SeqLM.from_pretrained(self.TRANSLATION_MODEL),
+            )
+        return self._translator
+
+    def translate(self, texts, progress=False):
+        """English for each input, translated in batches.
+
+        Takes modernised spelling: the model is trained on contemporary French
+        and reads period forms literally.
+        """
+        tokenizer, model = self._load_translator()
+        out = []
+        for start in range(0, len(texts), self.TRANSLATION_BATCH):
+            chunk = texts[start:start + self.TRANSLATION_BATCH]
+            batch = tokenizer(chunk, return_tensors='pt', padding=True,
+                              truncation=True, max_length=512)
+            generated = model.generate(**batch, max_new_tokens=512)
+            out.extend(tokenizer.batch_decode(generated, skip_special_tokens=True))
+            if progress and (start // self.TRANSLATION_BATCH) % 10 == 0:
+                print(f'  ...translated {min(start + self.TRANSLATION_BATCH, len(texts))}/{len(texts)}')
+        return out
+
     # Piper voice used for card audio, and where the image put it.
     TTS_VOICE = 'fr_FR-siwis-medium'
     TTS_VOICE_DIR = os.environ.get('PIPER_VOICE_DIR', '/opt/piper-voices')
@@ -106,7 +139,8 @@ class Corpus:
         digest = hashlib.sha1(text.encode('utf-8')).hexdigest()[:16]
         return f'tba-{digest}.mp3'
 
-    def generate_deck(self, path, name=None, limit=None, audio=True):
+    def generate_deck(self, path, name=None, limit=None, audio=True,
+                      translate=True):
         """Write an Anki .apkg of the corpus, easiest sentences first.
 
         Cards are added in difficulty order so that Anki's default new-card
@@ -126,6 +160,14 @@ class Corpus:
         if limit is not None:
             ranked = ranked[:limit]
 
+        # Translate up front: batching is far faster than one call per card.
+        english = [''] * len(ranked)
+        if translate:
+            print(f'Translating {len(ranked)} sentences ...')
+            english = self.translate(
+                [' '.join(sent.text.split()) for _s, sent, _f in ranked],
+                progress=True)
+
         # Media lives in a scratch directory only until the package is zipped.
         with tempfile.TemporaryDirectory() as media_dir:
             media = []
@@ -144,7 +186,8 @@ class Corpus:
 
                 deck.add_note(genanki.Note(
                     model=model,
-                    fields=[text, builder.sentence_html(sent), self.link, sound],
+                    fields=[text, builder.sentence_html(sent), self.link, sound,
+                            english[n - 1]],
                     # Keyed on the sentence so re-generating updates notes in
                     # place instead of duplicating them on re-import.
                     guid=genanki.guid_for(text),

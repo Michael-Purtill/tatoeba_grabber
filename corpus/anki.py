@@ -209,6 +209,7 @@ FRONT_TEMPLATE = """
 BACK_TEMPLATE = """
 <div class="audio">{{Audio}}</div>
 <div class="sentence" id="sentence">{{Annotated}}</div>
+<div class="translation">{{Translation}}</div>
 <div id="panel" class="panel empty">Tap any word for its grammar.</div>
 <div class="source">{{Source}}</div>
 <script>
@@ -382,6 +383,14 @@ CSS = """
 }
 .tok:hover { background: #f0ece2; }
 .tok.active { background: #ffe9a8; border-bottom-color: #d9a441; }
+.translation {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 16px;
+  color: #555;
+  margin: -6px 0 16px 0;
+  padding-left: 12px;
+  border-left: 3px solid #e0d9c4;
+}
 .panel {
   border-top: 1px solid #ddd;
   padding-top: 12px;
@@ -412,6 +421,9 @@ CSS = """
 .nightMode .card, .night_mode .card { color: #e8e6e3; background: #2c2c2e; }
 .nightMode .tok:hover, .night_mode .tok:hover { background: #3a3a3c; }
 .nightMode .tok.active, .night_mode .tok.active { background: #5c4a1f; }
+.nightMode .translation, .night_mode .translation {
+  color: #b8b5b0; border-left-color: #4a442f;
+}
 .nightMode .grammar, .night_mode .grammar { color: #bbb; }
 .nightMode .own, .night_mode .own { color: #999; }
 .nightMode .lemma a, .night_mode .lemma a { color: #6bb3e0; }
@@ -427,7 +439,8 @@ def build_model() -> genanki.Model:
         MODEL_ID,
         'Parsed sentence',
         fields=[{'name': 'Sentence'}, {'name': 'Annotated'},
-                {'name': 'Source'}, {'name': 'Audio'}],
+                {'name': 'Source'}, {'name': 'Audio'},
+                {'name': 'Translation'}],
         templates=[{
             'name': 'Reading',
             'qfmt': FRONT_TEMPLATE,
