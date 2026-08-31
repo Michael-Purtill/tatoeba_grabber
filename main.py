@@ -13,13 +13,16 @@ def main():
                         help='deck name as it appears in Anki')
     parser.add_argument('--no-audio', dest='audio', action='store_false',
                         help='skip text-to-speech (much faster while iterating)')
+    parser.add_argument('--no-translation', dest='translate', action='store_false',
+                        help='skip machine translation')
     args = parser.parse_args()
 
     corpus = DeMaistre()
     print(f'Scraping and parsing {corpus.link} ...')
 
     count = corpus.generate_deck(args.output, name=args.name,
-                                 limit=args.limit, audio=args.audio)
+                                 limit=args.limit, audio=args.audio,
+                                 translate=args.translate)
     print(f'Wrote {count} cards to {args.output}')
 
 
